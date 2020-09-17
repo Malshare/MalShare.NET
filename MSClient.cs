@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -23,7 +23,7 @@ namespace MalShare.NET
 
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
             request.AutomaticDecompression = DecompressionMethods.GZip;
-            request.Timeout = 5000;
+            request.Timeout = 30000;
 
             try
             {
@@ -38,46 +38,56 @@ namespace MalShare.NET
 
             return html;
         }
-        public List<string> Search(string searchQuery)
+        public List<List<string>> Search(string searchQuery)
         {
-            List<string> searchResults = new List<string>();
+            List<List<string>> searchResults = new List<List<string>>();
 
             string html = String.Empty;
             string url = $@"https://malshare.com/api.php?api_key={key}&action=search&query={searchQuery}";
-
 
             html = GetResponse(url);
 
             if (!String.IsNullOrEmpty(html))
             {
-                dynamic dynObj = JsonConvert.DeserializeObject(html);
-
-                searchResults.Add("MD5: " + dynObj.md5);
-                searchResults.Add("SHA1: " + dynObj.sha1);
-                searchResults.Add("SHA256: " + dynObj.sha256);
-                searchResults.Add("Type: " + dynObj.type);
-                searchResults.Add("Added: " + dynObj.added);
-                searchResults.Add("Source: " + dynObj.source);
-
-                foreach (var item in dynObj.yarahits.yara)
+                var result = JsonConvert.DeserializeObject<List<Search>>(html);
+                foreach (var res in result)
                 {
-                    searchResults.Add("Yara: " + item);
-                }
+                    StringBuilder yara = new StringBuilder("Yara Hits: ");
+                    StringBuilder parentfiles = new StringBuilder("Parent Files: ");
+                    StringBuilder subfiles = new StringBuilder("Sub Files: ");
 
-                if (!String.IsNullOrWhiteSpace(dynObj.yarahits.parentfiles))
-                {
-                    searchResults.Add("Parent Files: " + dynObj.yarahits.parentfiles);
-                }
-                if (!String.IsNullOrWhiteSpace(dynObj.yarahits.subfiles))
-                {
-                    searchResults.Add("Sub Files: " + dynObj.yarahits.subfiles);
+                    if (res.yarahits.yara.Count == 0)
+                    {
+                        yara.Append("-");
+                    }
+                    else
+                    {
+                        yara.Append(String.Join(", ", res.yarahits.yara));
+                    }
+                    if (res.parentfiles.Count == 0)
+                    {
+                        parentfiles.Append("-");
+                    }
+                    else
+                    {
+                        parentfiles.Append(String.Join(", ", res.parentfiles));
+                    }
+                    if (res.subfiles.Count == 0)
+                    {
+                        subfiles.Append("-");
+                    }
+                    else
+                    {
+                        subfiles.Append(String.Join(", ", res.subfiles));
+                    }
+
+                    searchResults.Add(new List<string> { $"MD5: {res.md5}", $"SHA1: {res.sha1}", $"SHA256: {res.sha256}", $"Type: {res.type}", $"Added: {res.added}", $"Source: {res.source}", yara.ToString(), parentfiles.ToString(), subfiles.ToString() });
                 }
             }
             else
             {
-                searchResults.Add($"Results for {searchQuery}: Not found.");
+                searchResults.Add(new List<string> { $"Results for {searchQuery}: Not found." });
             }
-
 
             return searchResults;
         }
@@ -412,5 +422,21 @@ namespace MalShare.NET
         public string md5 { get; set; }
         public string sha1 { get; set; }
         public string sha256 { get; set; }
+    }
+    public class Search
+    {
+        public string md5 { get; set; }
+        public string sha1 { get; set; }
+        public string sha256 { get; set; }
+        public string type { get; set; }
+        public string added { get; set; }
+        public string source { get; set; }
+        public Yarahits yarahits { get; set; }
+        public List<string> parentfiles { get; set; }
+        public List<string> subfiles { get; set; }
+    }
+    public class Yarahits
+    {
+        public List<string> yara { get; set; }
     }
 }
